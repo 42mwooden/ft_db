@@ -1,0 +1,98 @@
+************************************************************
+***************************Serialization Format*************
+************************************************************
+
+** TYPES **
+
+s = String. A string is a classic string of characters. Examples:
+	[s:4:"meow"] => String of length four and value "meow";
+	[s:3:"cat"] => String of length 3 and value "cat";
+
+i = Int32. For now stored as ascii characters in base 10. Examples:
+	[i:42] => int with value 42;
+	[i:-42] => int with value -42;
+
+d = Double. For now stored as ascii characters in base 10. Examples:
+	[d:4.2] => double with value 4.2;
+	[d:3.14159] => double with value 3.14159;
+
+a = Array. An array holds values of the same type, with a key equal to their position within the array (an int). Examples:
+	[a:i:4:{42;0;-42;413;}] => int array with four elements: 42, 0, -42 and 413;
+	[a:s:2:{3:"cat";4:"meow";}] => string array with two elements: "cat" and "meow";
+
+
+** STRUCTURE **
+
+k = Key. A key's name is like a string, but can only contain alphanumeric characters. A key is a way to store values outside of a table. Examples:
+	[k:4:name,s:5:"Pablo";] => Store the string "Pablo" in the key 'name'.
+
+f = Format. A format outlines a set of keys to be used as column names for tables. Example:
+	[f:2:{k:2:id,i;k:4:name,s}] => This format has an 'id' saved as an int on the first column and a 'name' saved as a string on the second column;
+
+t = Tables. Tables have a name saved as a key, a format for their columns, and a list of rows containing a value for each column. Example:
+	[t:1:{k:5:Users,f:2:{k:2:id,i;k:4:name,s},3:{0,8:"palatorr";1,6:"myoung";2,8:"crenflow";};}] => One table whose name is "Users" and has two columns: the first is "id" and holds an int, and the second is "name" and holds a string. It has three users, palatorr myoung and crenflow. Notice that we no longer need to state the type of each field, as we have already specified their types in the format;
+
+
+************************************************************
+***************************Serialization Sample*************
+************************************************************
+
+'dbname' => "Sample";
+'cookies' => (4, 2, 42);
+'Users':
+	0: "name" => "palatorr", "pwd" => "HASH";
+	1: "name" => "myoung", "pwd" => "HASH";
+;
+'Categories':
+	0: "name" => "Animal", "data" => 'Animals':
+		0: "species" => "cat", "sound" => "meow";
+		1: "species" => "dog", "sound" => "woof";
+		2: "species" => "cow", "sound" => "moo";
+		3: "species" => "pablo", "sound" => "meow";
+	;
+	1: "name" => "Album", "data" => 'Albums':
+		0: "artist" => "Infected Mushroom", "name" => "Converting Vegetarians";
+		1: "artist" => "Infected Mushroom", "name" => "Vicious Delicious";
+		2: "artist" => "Pentakill", "name" => "Pentakill";
+	;
+;
+'OtherTypes':
+	0: "name" => "int32", "data" =>
+		42,
+		408,
+		-42
+	;
+	1: "name" => "float", "data" =>
+		0.1,
+		45012.12345,
+		-150.0
+	;
+;
+
+k:6:dbname,s:6:"Sample";k:7:cookies,a:i:3:{4;2;42;};t:3:{k:5:Users,f:3:{k:2:id,i;k:4:name,s;k:3:pwd,s;},2:{0,8:"palatorr",4:"HASH";1,6:"myoung",4:"HASH";};k:10:Categories,f:3:{k:2:id,i;k:4:name,s;k:4:data,t;},2:{0,6:"Animal",1:{k:7:Animals,f:3:{k:2:id,i;k:7:species,s;k:5:sound,s;},4:{0,3:"cat",4:"meow";1,3:"dog",4:"woof";2,3:"cow",3:"moo";3,5:"pablo",4:"meow";};};1,5:"Album",1:{k:6:Albums,f:3:{k:2:id,i;k:6:artist,s;k:4:name,s;},3:{0,s:17:"Infected Mushroom",22:"Converting Vegetarians";1,17:"Infected Mushroom",17:"Vicious Delicious";2,9:"Pentakill",9:"Pentakill";};};};k:10:OtherTypes,f:3:{k:2:id,i;k:4:name,s;k:4:data,a;},2:{0,5:"int32",i:3:{42;408;-42;};1,5:"float",f:3:{0.1;45012.12345;-150.0;};};}
+
+
+************************************************************
+*********************************Query Language*************
+************************************************************
+
+MAKE = Make a field. Examples:
+	[MAKE STRING dbname = "Sample"] => Make a simple string variable with the value "Sample" in it;
+	[MAKE INT ARRAY cookies] => Make a simple array of ints. An alternative declaration that doesn't require further INSERT calls would be:
+	[MAKE INT ARRAY cookies = (4, 2, 42)] => Here the array is initialized;
+
+CREATE = Create a table. Examples:
+	[CREATE Users (id INT ID, name STRING, pwd STRING)] => Add a table called Users with columns (id, name, pwd);
+	[CREATE Categories (id INT ID, name STRING, data TABLE)] => Add a table called Categories with columns (id, name, data). Data will be a nested table;
+	[CREATE Animals (id INT ID, species STRING, sound STRING) TO Categories.data WHERE name = "Animal"] => Add a table with columns (id, species, sound) which will be in the column data of the table Categories, in the row that has "Animal" as the value for 'name'. When adding a table to another table, you must specify what column it will take and then a valid identifier for the row it will be in. If multiple rows match, it will add the table to each of them. If no WHEN is there to specify the row, the table will be added to all the rows. No identifier is a valid identifier. This example line requires for the insert line to add the row it is adding a table to;
+
+INSERT = Insert a row to a table, or a field to an array. Examples:
+	[INSERT ROW (#, "palatorr", "HASH") TO Users] => Add a row to the table Users. When adding a row, you must specify which table to add it to;
+	[INSERT ROW (#, "Animal", NULL) TO Categories] => Add a row to Categories. To have a table in this row, first set it to null and then add a table to that spot;
+	[INSERT INT 42 TO cookies] => For the first example of the cookies array implementation, here is the syntax for inserting a value onto the array;
+
+SET = Set a field's value. Example:
+	[SET Users.0.pwd = "NEW HASH"] => Set the value of the zeroth user's password to "NEW HASH";
+GET = Get a field's value. Example:
+	[GET Users.0.pwd] => Get the password for the zeroth user;
+	[GET Users WHERE id < 10] => Get all the users that have an id less than 10;
